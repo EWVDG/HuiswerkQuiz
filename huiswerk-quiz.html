@@ -443,7 +443,7 @@ Regels: PRECIES 20 vragen, elk met PRECIES 4 opties. correct is altijd index 0 (
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 4000,
+      body: JSON.stringify({ model: "claude-3-5-haiku-20241022", max_tokens: 4000,
         messages: [{ role: "user", content: [
           { type: "image", source: { type: "base64", media_type: imageMime, data: imageBase64 } },
           { type: "text", text: prompt }
