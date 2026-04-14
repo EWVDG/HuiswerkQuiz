@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Huiswerk Quiz voor Emmelie en Tim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F0E8;
+    --surface: #FFFDF8;
+    --primary: #2D5016;
+    --primary-light: #4A7C20;
+    --accent: #E8A020;
+    --accent-light: #F5C842;
+    --danger: #C0392B;
+    --danger-light: #F9EBEA;
+    --success: #1E7D3A;
+    --success-light: #E9F7EE;
+    --text: #1A1A1A;
+    --text-muted: #6B6B6B;
+    --border: rgba(0,0,0,0.10);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 1.5rem 1rem 3rem;
+  }
+  .app { width: 100%; max-width: 560px; }
+
+  .header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1.75rem;
+  }
+  .logo {
+    width: 44px; height: 44px;
+    background: var(--primary);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .header-title { font-size: 18px; font-weight: 800; color: var(--primary); line-height: 1.25; }
+
+  .screen { display: none; animation: fadeIn 0.2s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  }
+  .section-title { font-size: 12px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.75rem; }
+
+  /* Home */
+  .home-btn {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 1.1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 0.75rem;
+    cursor: pointer; transition: all 0.15s; text-align: left;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+  }
+  .home-btn:hover { border-color: var(--primary-light); background: rgba(45,80,22,0.03); transform: translateY(-1px); }
+  .home-btn-icon { font-size: 28px; flex-shrink: 0; }
+  .home-btn-title { font-size: 16px; font-weight: 800; color: var(--primary); }
+  .home-btn-sub { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  .saved-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .saved-item:last-child { border-bottom: none; }
+  .saved-item:hover .saved-name { color: var(--primary-light); }
+  .saved-icon { font-size: 20px; flex-shrink: 0; }
+  .saved-info { flex: 1; min-width: 0; }
+  .saved-name { font-size: 15px; font-weight: 700; color: var(--text); }
+  .saved-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .saved-score { font-size: 12px; font-weight: 700; margin-top: 2px; }
+  .saved-score.good { color: var(--success); }
+  .saved-score.bad { color: var(--danger); }
+  .saved-delete { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--text-muted); padding: 4px 8px; border-radius: 6px; flex-shrink: 0; }
+  .saved-delete:hover { background: var(--danger-light); color: var(--danger); }
+  .empty-state { text-align: center; padding: 1.25rem 0; color: var(--text-muted); font-size: 14px; }
+
+  /* Upload */
+  .upload-zone {
+    border: 2px dashed rgba(45,80,22,0.3);
+    border-radius: var(--radius);
+    padding: 2.5rem 1rem; text-align: center; cursor: pointer;
+    background: rgba(45,80,22,0.03); transition: all 0.15s; margin-bottom: 1rem;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--primary-light); background: rgba(45,80,22,0.07); }
+  .upload-emoji { font-size: 40px; margin-bottom: 10px; display: block; }
+  .upload-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+  .upload-hint { font-size: 13px; color: var(--text-muted); }
+  #fileInput { display: none; }
+  #previewImg { max-width: 100%; border-radius: var(--radius-sm); margin-top: 1rem; max-height: 260px; object-fit: contain; display: none; }
+
+  label.field-label { display: block; font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase; }
+  input[type="text"] {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+    font-family: 'Nunito', sans-serif; font-size: 15px; color: var(--text);
+    background: var(--surface); outline: none; transition: border-color 0.15s;
+  }
+  input[type="text"]:focus { border-color: var(--primary-light); }
+
+  .btn {
+    display: block; width: 100%; padding: 14px; border: none;
+    border-radius: var(--radius-sm); font-family: 'Nunito', sans-serif;
+    font-size: 16px; font-weight: 800; cursor: pointer; transition: all 0.15s; text-align: center;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-light); transform: translateY(-1px); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.35; cursor: default; transform: none; }
+  .btn-secondary { background: transparent; color: var(--primary); border: 1.5px solid rgba(45,80,22,0.3); margin-top: 0.6rem; }
+  .btn-secondary:hover { background: rgba(45,80,22,0.06); }
+  .btn-accent { background: var(--accent); color: #fff; }
+  .btn-accent:hover { background: #d4911a; transform: translateY(-1px); }
+
+  /* Loading */
+  .loading-wrap { text-align: center; padding: 3rem 1rem; }
+  .spinner { width: 44px; height: 44px; border: 4px solid rgba(45,80,22,0.15); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.75s linear infinite; margin: 0 auto 1.25rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-title { font-size: 16px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+  .loading-sub { font-size: 13px; color: var(--text-muted); }
+  .loading-prog-bar { height: 6px; background: rgba(45,80,22,0.12); border-radius: 99px; overflow: hidden; margin-top: 1.25rem; }
+  .loading-prog-fill { height: 100%; background: var(--primary); border-radius: 99px; width: 5%; transition: width 1s ease; }
+
+  /* Quiz */
+  .progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 1.25rem; }
+  .progress-bar { flex: 1; height: 8px; background: rgba(45,80,22,0.12); border-radius: 99px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--primary); border-radius: 99px; transition: width 0.4s ease; }
+  .progress-label { font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+  .topic-pill { display: inline-block; background: rgba(45,80,22,0.10); color: var(--primary); font-size: 12px; font-weight: 700; padding: 4px 12px; border-radius: 99px; margin-bottom: 1rem; letter-spacing: 0.03em; text-transform: uppercase; }
+  .question-text { font-size: 18px; font-weight: 700; line-height: 1.45; margin-bottom: 1.5rem; color: var(--text); }
+  .answer-btn { display: block; width: 100%; padding: 13px 16px; margin-bottom: 10px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: 'Nunito', sans-serif; font-size: 15px; font-weight: 600; color: var(--text); text-align: left; cursor: pointer; transition: all 0.12s; }
+  .answer-btn:hover:not(:disabled) { border-color: var(--primary-light); background: rgba(45,80,22,0.04); }
+  .answer-btn.correct { background: var(--success-light); border-color: var(--success); color: var(--success); }
+  .answer-btn.wrong { background: var(--danger-light); border-color: var(--danger); color: var(--danger); }
+  .answer-btn:disabled { cursor: default; }
+  .feedback { padding: 12px 16px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; line-height: 1.5; margin-bottom: 1rem; display: none; }
+  .feedback.correct { background: var(--success-light); color: var(--success); border: 1px solid rgba(30,125,58,0.2); }
+  .feedback.wrong { background: var(--danger-light); color: var(--danger); border: 1px solid rgba(192,57,43,0.2); }
+
+  /* Results */
+  .score-card { background: var(--primary); color: #fff; border-radius: var(--radius); padding: 2rem 1.5rem; text-align: center; margin-bottom: 1rem; }
+  .score-fraction { font-size: 56px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+  .score-pct { font-size: 15px; opacity: 0.75; font-weight: 600; margin-bottom: 8px; }
+  .score-msg { font-size: 18px; font-weight: 700; }
+  .result-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .result-row:last-child { border-bottom: none; }
+  .result-q { flex: 1; color: var(--text); font-weight: 600; line-height: 1.4; }
+  .badge { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 99px; white-space: nowrap; letter-spacing: 0.03em; text-transform: uppercase; }
+  .badge-good { background: var(--success-light); color: var(--success); }
+  .badge-bad { background: var(--danger-light); color: var(--danger); }
+  .save-row { display: flex; gap: 8px; }
+  .save-row input { flex: 1; }
+  .save-row .btn { width: auto; padding: 11px 18px; font-size: 14px; margin-top: 0; }
+  .mt1 { margin-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">📚</div>
+    <div class="header-title">Huiswerk Quiz voor<br>Emmelie en Tim</div>
+  </div>
+
+  <!-- HOME -->
+  <div id="screen-home" class="screen active">
+    <button class="home-btn" id="newQuizBtn">
+      <span class="home-btn-icon">📷</span>
+      <div>
+        <div class="home-btn-title">Nieuwe quiz maken</div>
+        <div class="home-btn-sub">Foto van huiswerk → AI maakt 20 vragen</div>
+      </div>
+    </button>
+    <div class="card">
+      <div class="section-title">Opgeslagen quizzen</div>
+      <div id="savedList"></div>
+    </div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div id="screen-upload" class="screen">
+    <div class="upload-zone" id="uploadZone">
+      <span class="upload-emoji">📷</span>
+      <div class="upload-title">Foto van huiswerk kiezen</div>
+      <div class="upload-hint">Tik hier of sleep een afbeelding</div>
+      <input type="file" id="fileInput" accept="image/*" capture="environment">
+      <img id="previewImg">
+    </div>
+    <div class="card" id="subjectCard" style="display:none">
+      <label class="field-label">Vak (optioneel)</label>
+      <input type="text" id="subjectInput" placeholder="bijv. aardrijkskunde, biologie, geschiedenis...">
+    </div>
+    <button class="btn btn-primary" id="startBtn" disabled>Maak 20 quizvragen →</button>
+    <button class="btn btn-secondary" id="backToHomeBtn">← Terug</button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-wrap">
+      <div class="spinner"></div>
+      <div class="loading-title" id="loadingMsg">Huiswerk analyseren...</div>
+      <div class="loading-sub">De AI maakt 20 vragen voor je klaar</div>
+      <div class="loading-prog-bar"><div class="loading-prog-fill" id="loadingProgFill"></div></div>
+    </div>
+  </div>
+
+  <!-- QUIZ -->
+  <div id="screen-quiz" class="screen">
+    <div class="progress-row">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div class="progress-label" id="progressLabel">1 / 20</div>
+    </div>
+    <div class="card">
+      <div class="topic-pill" id="topicPill" style="display:none"></div>
+      <div class="question-text" id="questionText"></div>
+      <div id="answersContainer"></div>
+      <div class="feedback" id="feedbackBox"></div>
+      <button class="btn btn-primary" id="nextBtn" style="display:none">Volgende vraag →</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="screen-results" class="screen">
+    <div class="score-card">
+      <div class="score-fraction" id="scoreFraction"></div>
+      <div class="score-pct" id="scorePct"></div>
+      <div class="score-msg" id="scoreMsg"></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Quiz opslaan</div>
+      <div class="save-row">
+        <input type="text" id="saveNameInput" placeholder="Naam voor deze quiz...">
+        <button class="btn btn-primary" id="saveBtn">Opslaan</button>
+      </div>
+      <div id="saveStatus" style="font-size:13px; color:var(--success); font-weight:700; margin-top:8px; display:none;">✓ Opgeslagen!</div>
+    </div>
+    <div class="card" id="resultsList"></div>
+    <button class="btn btn-accent mt1" id="retryBtn">Opnieuw oefenen</button>
+    <button class="btn btn-secondary" id="newPhotoBtn">← Terug naar home</button>
+  </div>
+</div>
+
+<script>
+const API_KEY = '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';
+
+let questions = [], currentQ = 0, score = 0, answers = [];
+let imageBase64 = '', imageMime = 'image/jpeg', currentTopic = '';
+let currentSaveIdx = -1;
+
+function getSaved() { try { return JSON.parse(localStorage.getItem('hq_saved') || '[]'); } catch(e) { return []; } }
+function setSaved(arr) { localStorage.setItem('hq_saved', JSON.stringify(arr)); }
+
+function renderHome() {
+  showScreen('screen-home');
+  const list = document.getElementById('savedList');
+  const saved = getSaved();
+  if (!saved.length) { list.innerHTML = '<div class="empty-state">Nog geen opgeslagen quizzen</div>'; return; }
+  list.innerHTML = '';
+  saved.slice().reverse().forEach((quiz, ri) => {
+    const i = saved.length - 1 - ri;
+    const pct = quiz.score !== undefined ? Math.round(quiz.score / quiz.total * 100) : null;
+    const item = document.createElement('div');
+    item.className = 'saved-item';
+    item.innerHTML = `
+      <span class="saved-icon">📝</span>
+      <div class="saved-info">
+        <div class="saved-name">${quiz.name}</div>
+        <div class="saved-meta">${quiz.topic ? quiz.topic + ' · ' : ''}${quiz.total} vragen · ${new Date(quiz.date).toLocaleDateString('nl-NL')}</div>
+        ${pct !== null ? `<div class="saved-score ${pct>=60?'good':'bad'}">${quiz.score}/${quiz.total} (${pct}%)</div>` : ''}
+      </div>
+      <button class="saved-delete" title="Verwijderen">🗑</button>`;
+    item.querySelector('.saved-delete').addEventListener('click', e => { e.stopPropagation(); deleteSaved(i); });
+    item.addEventListener('click', () => loadSaved(i));
+    list.appendChild(item);
+  });
+}
+
+function deleteSaved(i) { const s = getSaved(); s.splice(i,1); setSaved(s); renderHome(); }
+
+function loadSaved(i) {
+  const quiz = getSaved()[i];
+  questions = quiz.questions;
+  currentTopic = quiz.topic || '';
+  currentSaveIdx = i;
+  currentQ = 0; score = 0; answers = [];
+  document.getElementById('topicPill').textContent = currentTopic;
+  document.getElementById('topicPill').style.display = currentTopic ? 'inline-block' : 'none';
+  showScreen('screen-quiz');
+  showQuestion();
+}
+
+document.getElementById('newQuizBtn').addEventListener('click', () => showScreen('screen-upload'));
+
+// Upload
+const uploadZone = document.getElementById('uploadZone');
+const fileInput  = document.getElementById('fileInput');
+const previewImg = document.getElementById('previewImg');
+const startBtn   = document.getElementById('startBtn');
+const subjectCard= document.getElementById('subjectCard');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  imageMime = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = ev => {
+    imageBase64 = ev.target.result.split(',')[1];
+    previewImg.src = ev.target.result; previewImg.style.display = 'block';
+    startBtn.disabled = false; subjectCard.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+document.getElementById('backToHomeBtn').addEventListener('click', () => {
+  fileInput.value = ''; previewImg.style.display = 'none';
+  startBtn.disabled = true; subjectCard.style.display = 'none'; imageBase64 = '';
+  renderHome();
+});
+
+startBtn.addEventListener('click', generateQuestions);
+
+async function generateQuestions() {
+  showScreen('screen-loading');
+  const subject = document.getElementById('subjectInput').value.trim();
+  const msgs = ['Huiswerk analyseren...','Vragen bedenken...','Antwoorden verzinnen...','Quiz samenstellen...','Bijna klaar...'];
+  let mi = 0;
+  const msgEl = document.getElementById('loadingMsg');
+  const pf = document.getElementById('loadingProgFill');
+  let prog = 5;
+  const iv = setInterval(() => { msgEl.textContent = msgs[++mi % msgs.length]; prog = Math.min(prog+14, 88); pf.style.width = prog+'%'; }, 2500);
+
+  const prompt = `Je bent een slimme onderwijsassistent. Analyseer dit huiswerk${subject?' voor het vak '+subject:''} grondig en maak er precies 20 quizvragen van.
+
+Geef ALLEEN geldig JSON terug, geen markdown, geen extra tekst:
+{
+  "topic": "korte omschrijving onderwerp (max 5 woorden)",
+  "questions": [
+    {
+      "question": "De vraag",
+      "answers": ["Juist antwoord", "Fout antwoord 1", "Fout antwoord 2", "Fout antwoord 3"],
+      "correct": 0,
+      "explanation": "Korte uitleg (max 2 zinnen)"
+    }
+  ]
+}
+
+Regels: PRECIES 20 vragen, elk met PRECIES 4 opties. correct is altijd index 0 (app shufflet ze). Variatie in vraagtypen. Spreiding over het hele onderwerp. Geen dubbele vragen. Schrijf alles in het Nederlands.`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": API_KEY, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000,
+        messages: [{ role: "user", content: [
+          { type: "image", source: { type: "base64", media_type: imageMime, data: imageBase64 } },
+          { type: "text", text: prompt }
+        ]}]
+      })
+    });
+    clearInterval(iv); pf.style.width = '100%';
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = data.content.map(i => i.text||'').join('');
+    const parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
+
+    questions = parsed.questions.map(q => {
+      const arr = [...q.answers];
+      for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+      return {...q, shuffled: arr, correctAnswer: q.answers[0]};
+    });
+    currentTopic = parsed.topic || '';
+    document.getElementById('topicPill').textContent = currentTopic;
+    document.getElementById('topicPill').style.display = currentTopic ? 'inline-block' : 'none';
+
+    // Auto-save without score
+    const name = subject || currentTopic || ('Quiz '+new Date().toLocaleDateString('nl-NL'));
+    const saved = getSaved();
+    saved.push({ name, topic: currentTopic, questions, total: questions.length, date: Date.now() });
+    setSaved(saved);
+    currentSaveIdx = saved.length - 1;
+
+    currentQ = 0; score = 0; answers = [];
+    showScreen('screen-quiz'); showQuestion();
+  } catch(err) {
+    clearInterval(iv);
+    alert('Er ging iets mis: ' + err.message);
+    showScreen('screen-upload');
+  }
+}
+
+function showQuestion() {
+  const q = questions[currentQ], total = questions.length;
+  document.getElementById('progressFill').style.width = (currentQ/total*100)+'%';
+  document.getElementById('progressLabel').textContent = (currentQ+1)+' / '+total;
+  document.getElementById('questionText').textContent = q.question;
+  const c = document.getElementById('answersContainer'); c.innerHTML = '';
+  q.shuffled.forEach(ans => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn'; btn.textContent = ans;
+    btn.addEventListener('click', () => selectAnswer(ans, btn));
+    c.appendChild(btn);
+  });
+  const fb = document.getElementById('feedbackBox'); fb.style.display='none'; fb.className='feedback';
+  document.getElementById('nextBtn').style.display = 'none';
+}
+
+function selectAnswer(answer, btn) {
+  const q = questions[currentQ];
+  const ok = answer === q.correctAnswer;
+  if(ok) score++;
+  answers.push({ question: q.question, isCorrect: ok, correct: q.correctAnswer });
+  document.querySelectorAll('.answer-btn').forEach(b => {
+    b.disabled = true;
+    if(b.textContent === q.correctAnswer) b.classList.add('correct');
+    else if(b === btn && !ok) b.classList.add('wrong');
+  });
+  const fb = document.getElementById('feedbackBox');
+  fb.className = 'feedback '+(ok?'correct':'wrong');
+  fb.textContent = (ok ? '✓ Goed! ' : '✗ Helaas. ') + q.explanation;
+  fb.style.display = 'block';
+  const nb = document.getElementById('nextBtn'); nb.style.display='block';
+  nb.textContent = currentQ < questions.length-1 ? 'Volgende vraag →' : 'Bekijk resultaat →';
+}
+
+document.getElementById('nextBtn').addEventListener('click', () => { currentQ++; currentQ < questions.length ? showQuestion() : showResults(); });
+
+function showResults() {
+  showScreen('screen-results');
+  const total = questions.length, pct = Math.round(score/total*100);
+  document.getElementById('scoreFraction').textContent = score+'/'+total;
+  document.getElementById('scorePct').textContent = pct+'% goed';
+  document.getElementById('scoreMsg').textContent = pct>=80 ? '🌟 Uitstekend gedaan!' : pct>=60 ? '👍 Goed bezig!' : '📚 Blijven oefenen!';
+
+  // Pre-fill save name
+  const saved = getSaved();
+  const existing = currentSaveIdx >= 0 && currentSaveIdx < saved.length ? saved[currentSaveIdx] : null;
+  document.getElementById('saveNameInput').value = existing ? existing.name : (currentTopic || 'Quiz '+new Date().toLocaleDateString('nl-NL'));
+  document.getElementById('saveStatus').style.display = 'none';
+  document.getElementById('saveBtn').disabled = false;
+  document.getElementById('saveBtn').textContent = 'Opslaan';
+
+  const list = document.getElementById('resultsList'); list.innerHTML = '';
+  answers.forEach(a => {
+    const row = document.createElement('div'); row.className='result-row';
+    row.innerHTML = `<span class="result-q">${a.question}</span><span class="badge ${a.isCorrect?'badge-good':'badge-bad'}">${a.isCorrect?'Goed':'Fout'}</span>`;
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+  const name = document.getElementById('saveNameInput').value.trim() || ('Quiz '+new Date().toLocaleDateString('nl-NL'));
+  const saved = getSaved();
+  saved.push({ name, topic: currentTopic, questions, total: questions.length, score, date: Date.now() });
+  setSaved(saved);
+  document.getElementById('saveStatus').style.display = 'block';
+  document.getElementById('saveBtn').disabled = true;
+  document.getElementById('saveBtn').textContent = '✓';
+});
+
+document.getElementById('retryBtn').addEventListener('click', () => {
+  questions = questions.map(q => {
+    const arr = [...q.answers];
+    for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+    return {...q, shuffled: arr};
+  });
+  currentQ=0; score=0; answers=[];
+  showScreen('screen-quiz'); showQuestion();
+});
+
+document.getElementById('newPhotoBtn').addEventListener('click', () => {
+  fileInput.value=''; previewImg.style.display='none'; previewImg.src='';
+  startBtn.disabled=true; subjectCard.style.display='none'; imageBase64='';
+  document.getElementById('subjectInput').value = '';
+  renderHome();
+});
+
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+
+renderHome();
+</script>
+</body>
+</html>
