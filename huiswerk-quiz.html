@@ -239,6 +239,18 @@
       <div class="feedback" id="feedbackBox"></div>
       <button class="btn btn-primary" id="nextBtn" style="display:none">Volgende vraag →</button>
     </div>
+    <div style="display:flex; gap:8px; margin-top:0.25rem;">
+      <button class="btn btn-secondary" id="prevBtn" style="margin-top:0; flex:1;">← Vorige</button>
+      <button class="btn btn-secondary" id="quizHomeBtn" style="margin-top:0; flex:1;">🏠 Home</button>
+      <button class="btn btn-secondary" id="skipBtn" style="margin-top:0; flex:1;">Sla over →</button>
+    </div>
+    <div id="quizConfirm" style="display:none; margin-top:0.75rem; background:#FFFDF8; border:1.5px solid rgba(45,80,22,0.25); border-radius:12px; padding:1rem; flex-direction:column; gap:10px;">
+      <p style="font-size:14px; font-weight:700; color:#1A1A1A; text-align:center;">Je voortgang wordt automatisch opgeslagen. Je kunt later verdergaan.</p>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-primary" id="quizConfirmYes" style="flex:1;">Opslaan &amp; naar home</button>
+        <button class="btn btn-secondary" id="quizConfirmNo" style="margin-top:0; flex:1;">Nee, ga door</button>
+      </div>
+    </div>
   </div>
 
   <!-- RESULTS -->
@@ -264,56 +276,111 @@
 
 <script>
 const API_KEY = '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';
+const SB_URL = 'https://leavdzpvoousvrkjfrra.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlYXZkenB2b291c3Zya2pmcnJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxODc3NDksImV4cCI6MjA5MTc2Mzc0OX0.zEZs6ZNdpg1g0Yi_ezR5OK6k0fk9Z7tA3y_a6D39CFU';
 
-let questions = [], currentQ = 0, score = 0, answers = [];
+let questions = [], currentQ = 0, score = 0, answers = [], answeredMap = {};
 let imageBase64 = '', imageMime = 'image/jpeg', currentTopic = '';
-let currentSaveIdx = -1;
+let currentSaveId = null;
+let savedQuizzes = [];
 
-function getSaved() { try { return JSON.parse(localStorage.getItem('hq_saved') || '[]'); } catch(e) { return []; } }
-function setSaved(arr) { localStorage.setItem('hq_saved', JSON.stringify(arr)); }
+// ── Supabase helpers ─────────────────────────────────────────────
+async function sbFetch(path, method='GET', body=null) {
+  const opts = { method, headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer '+SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' } };
+  if(body) opts.body = JSON.stringify(body);
+  const res = await fetch(SB_URL+'/rest/v1/'+path, opts);
+  if(!res.ok) { const e = await res.text(); throw new Error(e); }
+  return res.status === 204 ? null : res.json();
+}
 
-function renderHome() {
+async function loadQuizzesFromCloud() {
+  const data = await sbFetch('quizzen?order=aangemaakt_op.desc');
+  savedQuizzes = data || [];
+}
+
+async function saveQuizToCloud(quizObj) {
+  const row = {
+    naam: quizObj.name,
+    topic: quizObj.topic || '',
+    vragen: quizObj.questions,
+    totaal: quizObj.questions.length,
+    score: quizObj.score ?? null,
+    voortgang: quizObj.progress ?? null
+  };
+  if(quizObj.id) {
+    await sbFetch('quizzen?id=eq.'+quizObj.id, 'PATCH', row);
+    return quizObj.id;
+  } else {
+    const res = await sbFetch('quizzen', 'POST', row);
+    return res[0].id;
+  }
+}
+
+async function deleteQuizFromCloud(id) {
+  await sbFetch('quizzen?id=eq.'+id, 'DELETE');
+}
+
+// ── Home screen ──────────────────────────────────────────────────
+async function renderHome() {
   showScreen('screen-home');
   const list = document.getElementById('savedList');
-  const saved = getSaved();
-  if (!saved.length) { list.innerHTML = '<div class="empty-state">Nog geen opgeslagen quizzen</div>'; return; }
+  list.innerHTML = '<div class="empty-state">Laden...</div>';
+  try {
+    await loadQuizzesFromCloud();
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state" style="color:var(--danger);">Kon quizzen niet laden. Controleer je internetverbinding.</div>';
+    return;
+  }
+  if(!savedQuizzes.length) { list.innerHTML = '<div class="empty-state">Nog geen opgeslagen quizzen</div>'; return; }
   list.innerHTML = '';
-  saved.slice().reverse().forEach((quiz, ri) => {
-    const i = saved.length - 1 - ri;
-    const pct = quiz.score !== undefined ? Math.round(quiz.score / quiz.total * 100) : null;
+  savedQuizzes.forEach(quiz => {
+    const pct = quiz.score !== null && quiz.score !== undefined ? Math.round(quiz.score / quiz.totaal * 100) : null;
+    const inProgress = quiz.voortgang && quiz.voortgang.currentQ < quiz.totaal;
     const item = document.createElement('div');
     item.className = 'saved-item';
     item.innerHTML = `
       <span class="saved-icon">📝</span>
       <div class="saved-info">
-        <div class="saved-name">${quiz.name}</div>
-        <div class="saved-meta">${quiz.topic ? quiz.topic + ' · ' : ''}${quiz.total} vragen · ${new Date(quiz.date).toLocaleDateString('nl-NL')}</div>
-        ${pct !== null ? `<div class="saved-score ${pct>=60?'good':'bad'}">${quiz.score}/${quiz.total} (${pct}%)</div>` : ''}
+        <div class="saved-name">${quiz.naam}</div>
+        <div class="saved-meta">${quiz.topic ? quiz.topic+' · ' : ''}${quiz.totaal} vragen · ${new Date(quiz.aangemaakt_op).toLocaleDateString('nl-NL')}</div>
+        ${pct !== null ? `<div class="saved-score ${pct>=60?'good':'bad'}">${quiz.score}/${quiz.totaal} (${pct}%)</div>` : inProgress ? `<div class="saved-score" style="color:var(--accent);">▶ Bezig — vraag ${quiz.voortgang.currentQ+1} van ${quiz.totaal}</div>` : ''}
       </div>
       <button class="saved-delete" title="Verwijderen">🗑</button>`;
-    item.querySelector('.saved-delete').addEventListener('click', e => { e.stopPropagation(); deleteSaved(i); });
-    item.addEventListener('click', () => loadSaved(i));
+    item.querySelector('.saved-delete').addEventListener('click', async e => {
+      e.stopPropagation();
+      try { await deleteQuizFromCloud(quiz.id); renderHome(); } catch(err) { alert('Verwijderen mislukt: '+err.message); }
+    });
+    item.addEventListener('click', () => loadSaved(quiz));
     list.appendChild(item);
   });
 }
 
-function deleteSaved(i) { const s = getSaved(); s.splice(i,1); setSaved(s); renderHome(); }
-
-function loadSaved(i) {
-  const quiz = getSaved()[i];
-  questions = quiz.questions;
+function loadSaved(quiz) {
+  questions = quiz.vragen.map(q => {
+    if(q.shuffled) return q;
+    const arr = [...q.answers];
+    for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+    return {...q, shuffled: arr, correctAnswer: q.answers[0]};
+  });
   currentTopic = quiz.topic || '';
-  currentSaveIdx = i;
-  currentQ = 0; score = 0; answers = [];
+  currentSaveId = quiz.id;
   document.getElementById('topicPill').textContent = currentTopic;
   document.getElementById('topicPill').style.display = currentTopic ? 'inline-block' : 'none';
+  if(quiz.voortgang && quiz.voortgang.currentQ < questions.length) {
+    currentQ = quiz.voortgang.currentQ;
+    score = quiz.voortgang.score;
+    answers = quiz.voortgang.answers;
+    answeredMap = quiz.voortgang.answeredMap || {};
+  } else {
+    currentQ = 0; score = 0; answers = []; answeredMap = {};
+  }
   showScreen('screen-quiz');
   showQuestion();
 }
 
 document.getElementById('newQuizBtn').addEventListener('click', () => showScreen('screen-upload'));
 
-// Upload
+// ── Upload ───────────────────────────────────────────────────────
 const uploadZone = document.getElementById('uploadZone');
 const fileInput  = document.getElementById('fileInput');
 const previewImg = document.getElementById('previewImg');
@@ -385,7 +452,7 @@ Regels: PRECIES 20 vragen, elk met PRECIES 4 opties. correct is altijd index 0 (
     });
     clearInterval(iv); pf.style.width = '100%';
     const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
+    if(data.error) throw new Error(data.error.message);
     const text = data.content.map(i => i.text||'').join('');
     const parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
 
@@ -398,14 +465,10 @@ Regels: PRECIES 20 vragen, elk met PRECIES 4 opties. correct is altijd index 0 (
     document.getElementById('topicPill').textContent = currentTopic;
     document.getElementById('topicPill').style.display = currentTopic ? 'inline-block' : 'none';
 
-    // Auto-save without score
     const name = subject || currentTopic || ('Quiz '+new Date().toLocaleDateString('nl-NL'));
-    const saved = getSaved();
-    saved.push({ name, topic: currentTopic, questions, total: questions.length, date: Date.now() });
-    setSaved(saved);
-    currentSaveIdx = saved.length - 1;
+    currentSaveId = await saveQuizToCloud({ name, topic: currentTopic, questions });
 
-    currentQ = 0; score = 0; answers = [];
+    currentQ = 0; score = 0; answers = []; answeredMap = {};
     showScreen('screen-quiz'); showQuestion();
   } catch(err) {
     clearInterval(iv);
@@ -414,27 +477,49 @@ Regels: PRECIES 20 vragen, elk met PRECIES 4 opties. correct is altijd index 0 (
   }
 }
 
+// ── Quiz ─────────────────────────────────────────────────────────
 function showQuestion() {
   const q = questions[currentQ], total = questions.length;
   document.getElementById('progressFill').style.width = (currentQ/total*100)+'%';
   document.getElementById('progressLabel').textContent = (currentQ+1)+' / '+total;
   document.getElementById('questionText').textContent = q.question;
   const c = document.getElementById('answersContainer'); c.innerHTML = '';
+  const prev = answeredMap[currentQ];
   q.shuffled.forEach(ans => {
     const btn = document.createElement('button');
     btn.className = 'answer-btn'; btn.textContent = ans;
-    btn.addEventListener('click', () => selectAnswer(ans, btn));
+    if(prev) {
+      btn.disabled = true;
+      if(ans === q.correctAnswer) btn.classList.add('correct');
+      else if(ans === prev.chosen && !prev.isCorrect) btn.classList.add('wrong');
+    } else {
+      btn.addEventListener('click', () => selectAnswer(ans, btn));
+    }
     c.appendChild(btn);
   });
-  const fb = document.getElementById('feedbackBox'); fb.style.display='none'; fb.className='feedback';
-  document.getElementById('nextBtn').style.display = 'none';
+  const fb = document.getElementById('feedbackBox');
+  if(prev) {
+    fb.className = 'feedback '+(prev.isCorrect?'correct':'wrong');
+    fb.textContent = (prev.isCorrect ? '✓ Goed! ' : '✗ Helaas. ') + q.explanation;
+    fb.style.display = 'block';
+    const nb = document.getElementById('nextBtn'); nb.style.display='block';
+    nb.textContent = currentQ < total-1 ? 'Volgende vraag →' : 'Bekijk resultaat →';
+  } else {
+    fb.style.display='none'; fb.className='feedback';
+    document.getElementById('nextBtn').style.display = 'none';
+  }
+  document.getElementById('prevBtn').disabled = currentQ === 0;
+  document.getElementById('skipBtn').textContent = currentQ < total-1 ? 'Sla over →' : 'Afronden →';
 }
 
 function selectAnswer(answer, btn) {
   const q = questions[currentQ];
   const ok = answer === q.correctAnswer;
-  if(ok) score++;
-  answers.push({ question: q.question, isCorrect: ok, correct: q.correctAnswer });
+  if(!answeredMap[currentQ]) {
+    if(ok) score++;
+    answers.push({ question: q.question, isCorrect: ok, correct: q.correctAnswer });
+  }
+  answeredMap[currentQ] = { chosen: answer, isCorrect: ok };
   document.querySelectorAll('.answer-btn').forEach(b => {
     b.disabled = true;
     if(b.textContent === q.correctAnswer) b.classList.add('correct');
@@ -449,22 +534,37 @@ function selectAnswer(answer, btn) {
 }
 
 document.getElementById('nextBtn').addEventListener('click', () => { currentQ++; currentQ < questions.length ? showQuestion() : showResults(); });
+document.getElementById('prevBtn').addEventListener('click', () => { if(currentQ > 0) { currentQ--; showQuestion(); } });
+document.getElementById('skipBtn').addEventListener('click', () => {
+  if(currentQ < questions.length - 1) {
+    if(!answeredMap[currentQ]) answers.push({ question: questions[currentQ].question, isCorrect: false, correct: questions[currentQ].correctAnswer, skipped: true });
+    currentQ++; showQuestion();
+  } else { showResults(); }
+});
 
+document.getElementById('quizHomeBtn').addEventListener('click', async () => {
+  if(currentSaveId) {
+    try {
+      await saveQuizToCloud({ id: currentSaveId, name: currentTopic || 'Quiz', topic: currentTopic, questions, progress: { currentQ, score, answers, answeredMap } });
+    } catch(e) { console.warn('Opslaan mislukt:', e); }
+  }
+  currentQ=0; score=0; answers=[]; answeredMap={}; renderHome();
+});
+document.getElementById('quizConfirmYes').addEventListener('click', () => {});
+document.getElementById('quizConfirmNo').addEventListener('click', () => { document.getElementById('quizConfirm').style.display='none'; });
+
+// ── Results ──────────────────────────────────────────────────────
 function showResults() {
   showScreen('screen-results');
   const total = questions.length, pct = Math.round(score/total*100);
   document.getElementById('scoreFraction').textContent = score+'/'+total;
   document.getElementById('scorePct').textContent = pct+'% goed';
   document.getElementById('scoreMsg').textContent = pct>=80 ? '🌟 Uitstekend gedaan!' : pct>=60 ? '👍 Goed bezig!' : '📚 Blijven oefenen!';
-
-  // Pre-fill save name
-  const saved = getSaved();
-  const existing = currentSaveIdx >= 0 && currentSaveIdx < saved.length ? saved[currentSaveIdx] : null;
-  document.getElementById('saveNameInput').value = existing ? existing.name : (currentTopic || 'Quiz '+new Date().toLocaleDateString('nl-NL'));
+  const existing = savedQuizzes.find(q => q.id === currentSaveId);
+  document.getElementById('saveNameInput').value = existing ? existing.naam : (currentTopic || 'Quiz '+new Date().toLocaleDateString('nl-NL'));
   document.getElementById('saveStatus').style.display = 'none';
   document.getElementById('saveBtn').disabled = false;
   document.getElementById('saveBtn').textContent = 'Opslaan';
-
   const list = document.getElementById('resultsList'); list.innerHTML = '';
   answers.forEach(a => {
     const row = document.createElement('div'); row.className='result-row';
@@ -473,14 +573,19 @@ function showResults() {
   });
 }
 
-document.getElementById('saveBtn').addEventListener('click', () => {
+document.getElementById('saveBtn').addEventListener('click', async () => {
   const name = document.getElementById('saveNameInput').value.trim() || ('Quiz '+new Date().toLocaleDateString('nl-NL'));
-  const saved = getSaved();
-  saved.push({ name, topic: currentTopic, questions, total: questions.length, score, date: Date.now() });
-  setSaved(saved);
-  document.getElementById('saveStatus').style.display = 'block';
+  document.getElementById('saveBtn').textContent = '...';
   document.getElementById('saveBtn').disabled = true;
-  document.getElementById('saveBtn').textContent = '✓';
+  try {
+    await saveQuizToCloud({ id: currentSaveId, name, topic: currentTopic, questions, score, progress: null });
+    document.getElementById('saveStatus').style.display = 'block';
+    document.getElementById('saveBtn').textContent = '✓';
+  } catch(e) {
+    alert('Opslaan mislukt: '+e.message);
+    document.getElementById('saveBtn').disabled = false;
+    document.getElementById('saveBtn').textContent = 'Opslaan';
+  }
 });
 
 document.getElementById('retryBtn').addEventListener('click', () => {
@@ -489,7 +594,7 @@ document.getElementById('retryBtn').addEventListener('click', () => {
     for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
     return {...q, shuffled: arr};
   });
-  currentQ=0; score=0; answers=[];
+  currentQ=0; score=0; answers=[]; answeredMap={};
   showScreen('screen-quiz'); showQuestion();
 });
 
