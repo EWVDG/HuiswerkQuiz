@@ -367,21 +367,8 @@ async function renderHome() {
       <button class="saved-delete" title="Verwijderen">🗑</button>`;
     item.querySelector('.saved-delete').addEventListener('click', async e => {
       e.stopPropagation();
-      const bevestig = document.createElement('div');
-      bevestig.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:999;';
-      bevestig.innerHTML = `<div style="background:#FFFDF8;border-radius:16px;padding:1.5rem;max-width:320px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,0.15);">
-        <p style="font-family:Nunito,sans-serif;font-size:15px;font-weight:700;color:#1A1A1A;margin-bottom:1rem;text-align:center;">Wil je "<strong>${quiz.naam}</strong>" verwijderen?</p>
-        <div style="display:flex;gap:8px;">
-          <button id="confirmDel" style="flex:1;padding:12px;background:#C0392B;color:#fff;border:none;border-radius:10px;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer;">Ja, verwijder</button>
-          <button id="cancelDel" style="flex:1;padding:12px;background:transparent;color:#2D5016;border:1.5px solid rgba(45,80,22,0.3);border-radius:10px;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer;">Annuleren</button>
-        </div>
-      </div>`;
-      document.body.appendChild(bevestig);
-      bevestig.querySelector('#cancelDel').addEventListener('click', () => document.body.removeChild(bevestig));
-      bevestig.querySelector('#confirmDel').addEventListener('click', async () => {
-        document.body.removeChild(bevestig);
-        try { await deleteQuizFromCloud(quiz.id); renderHome(); } catch(err) { alert('Verwijderen mislukt: '+err.message); }
-      });
+      if(!confirm('Wil je "' + quiz.naam + '" verwijderen?')) return;
+      try { await deleteQuizFromCloud(quiz.id); renderHome(); } catch(err) { alert('Verwijderen mislukt: '+err.message); }
     });
     item.addEventListener('click', () => loadSaved(quiz));
     list.appendChild(item);
