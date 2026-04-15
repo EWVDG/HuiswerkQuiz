@@ -201,6 +201,10 @@
       </div>
     </button>
     <div class="card">
+      <div class="section-title">Laatste scores</div>
+      <div id="scoresList"></div>
+    </div>
+    <div class="card">
       <div class="section-title">Opgeslagen quizzen</div>
       <div id="savedList"></div>
     </div>
@@ -343,7 +347,34 @@ async function deleteQuizFromCloud(id) {
 async function renderHome() {
   showScreen('screen-home');
   const list = document.getElementById('savedList');
+  const scoresList = document.getElementById('scoresList');
   list.innerHTML = '<div class="empty-state">Laden...</div>';
+  scoresList.innerHTML = '<div class="empty-state">Laden...</div>';
+
+  // Laad scores
+  const scores = await laadLaatsteScores();
+  if(!scores.length) {
+    scoresList.innerHTML = '<div class="empty-state">Nog geen scores</div>';
+  } else {
+    scoresList.innerHTML = '';
+    scores.forEach(s => {
+      const datum = new Date(s.datum).toLocaleString('nl-NL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+      const kleur = s.score >= 5.5 ? 'var(--success)' : 'var(--danger)';
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;';
+      row.innerHTML = `
+        <div>
+          <div style="font-weight:700;color:var(--text);">${s.quiz_naam}</div>
+          <div style="color:var(--text-muted);font-size:11px;">${datum}</div>
+        </div>
+        <div style="font-size:20px;font-weight:800;color:${kleur};">${Number(s.score).toFixed(1)}</div>`;
+      scoresList.appendChild(row);
+    });
+    // Verwijder border van laatste item
+    if(scoresList.lastChild) scoresList.lastChild.style.borderBottom = 'none';
+  }
+
+  // Laad quizzen
   try {
     await loadQuizzesFromCloud();
   } catch(e) {
@@ -608,14 +639,42 @@ document.getElementById('quizConfirmYes').addEventListener('click', () => {});
 document.getElementById('quizConfirmNo').addEventListener('click', () => { document.getElementById('quizConfirm').style.display='none'; });
 
 // ── Results ──────────────────────────────────────────────────────
+function berekenCijfer(aantalGoed, totaal) {
+  const fouten = totaal - aantalGoed;
+  const cijfer = Math.max(0, 10 - fouten * 0.5);
+  return Math.round(cijfer * 10) / 10;
+}
+
+async function slaScoreOp(quizNaam, cijfer, totaal) {
+  try {
+    await sbFetch('scores', 'POST', { quiz_naam: quizNaam, score: cijfer, max_score: 10 });
+  } catch(e) { console.warn('Score opslaan mislukt:', e); }
+}
+
+async function laadLaatsteScores() {
+  try {
+    const data = await sbFetch('scores?order=datum.desc&limit=5');
+    return data || [];
+  } catch(e) { return []; }
+}
+
 function showResults() {
   showScreen('screen-results');
-  const total = questions.length, pct = Math.round(score/total*100);
-  document.getElementById('scoreFraction').textContent = score+'/'+total;
-  document.getElementById('scorePct').textContent = pct+'% goed';
-  document.getElementById('scoreMsg').textContent = pct>=80 ? '🌟 Uitstekend gedaan!' : pct>=60 ? '👍 Goed bezig!' : '📚 Blijven oefenen!';
+  const total = questions.length;
+  const fouten = answers.filter(a => !a.isCorrect).length;
+  const cijfer = berekenCijfer(score, total);
+  const cijferKleur = cijfer >= 5.5 ? 'var(--success)' : '#C0392B';
+
+  document.getElementById('scoreFraction').textContent = cijfer.toFixed(1);
+  document.getElementById('scorePct').textContent = score+' van '+total+' goed · '+fouten+' fout';
+  document.getElementById('scoreMsg').textContent = cijfer >= 9 ? '🌟 Uitstekend!' : cijfer >= 7 ? '👍 Goed gedaan!' : cijfer >= 5.5 ? '😊 Voldoende!' : '📚 Nog even oefenen!';
+
+  // Auto-save score
   const existing = savedQuizzes.find(q => q.id === currentSaveId);
-  document.getElementById('saveNameInput').value = existing ? existing.naam : (currentTopic || 'Quiz '+new Date().toLocaleDateString('nl-NL'));
+  const quizNaam = existing ? existing.naam : (currentTopic || 'Quiz');
+  slaScoreOp(quizNaam, cijfer, total);
+
+  document.getElementById('saveNameInput').value = quizNaam;
   document.getElementById('saveStatus').style.display = 'none';
   document.getElementById('saveBtn').disabled = false;
   document.getElementById('saveBtn').textContent = 'Opslaan';
